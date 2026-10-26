@@ -115,6 +115,10 @@ header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em}
 .show .small{font-size:17px;color:var(--muted);line-height:1.5}
 .show .hint{font-size:13px;color:var(--muted)}
 
+/* 화면 어둡게 (켜 둔 채 배터리 절약) */
+.blackout{position:fixed;inset:0;z-index:40;background:#000;display:flex;align-items:flex-end;justify-content:center;padding-bottom:max(28px,env(safe-area-inset-bottom,0px))}
+.blackout span{color:#3a3f45;font-size:13px}
+
 /* 대화상자 */
 dialog{border:0;padding:0;border-radius:16px;background:var(--panel);color:var(--ink);width:min(680px,calc(100vw - 24px));max-height:calc(100dvh - 32px)}
 dialog::backdrop{background:rgba(5,10,15,.55)}
@@ -158,6 +162,7 @@ legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px}
     <header>
       <h1>귓속말 알림</h1>
       <span class="pill" id="pill" data-s="idle"><i></i><span id="pillText">대기 중</span></span>
+      <button class="icon-btn" id="dimBtn" aria-label="화면 어둡게">어둡게</button>
       <button class="icon-btn" id="setBtn" aria-label="설정">설정</button>
     </header>
     <div id="banners"></div>
@@ -167,15 +172,18 @@ legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px}
     </div>
     <div class="strip" id="stripInterp">
       <label>상대 언어 <select id="partnerSel"></select></label>
-      <span>→ 한국어로 이어폰에 들려드려요</span>
+      <label>정보 귓속말 <select class="autoSel">
+        <option value="smart">알아서</option>
+        <option value="question">질문 나올 때만</option>
+        <option value="off">끄기</option>
+      </select></label>
     </div>
     <div class="strip" id="stripAssist" hidden>
-      <label>회의 언어 <select id="assistLangSel"></select></label>
-      <label>알려주는 때 <select id="autoSel">
-        <option value="question">질문이 나올 때</option>
-        <option value="interval">1분마다</option>
-        <option value="both">질문 + 1분마다</option>
-        <option value="off">직접 요청할 때만</option>
+      <label>대화 언어 <select id="assistLangSel"></select></label>
+      <label>정보 귓속말 <select class="autoSel">
+        <option value="smart">알아서 (상황 판단)</option>
+        <option value="question">질문 나올 때만</option>
+        <option value="off">지금 알려줘 누를 때만</option>
       </select></label>
     </div>
     <div class="live" aria-live="polite">
@@ -207,6 +215,8 @@ legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px}
   <div class="small" id="showKo"></div>
   <div class="hint">화면을 누르면 닫힙니다</div>
 </div>
+
+<div class="blackout" id="dim" hidden><span>듣는 중 · 두 번 누르면 돌아갑니다</span></div>
 
 <!-- 설정 -->
 <dialog id="setDlg">
@@ -260,6 +270,18 @@ legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px}
       </fieldset>
 
       <fieldset>
+        <legend>정보 귓속말</legend>
+        <div class="row"><span>얼마나 자주 알려줄까요? (「알아서」일 때)</span>
+          <select id="freqSel">
+            <option value="low">가끔 — 꼭 필요한 것만 (최소 90초 간격)</option>
+            <option value="mid">보통 (최소 45초 간격)</option>
+            <option value="high">자주 (최소 20초 간격)</option>
+          </select>
+        </div>
+        <label class="chk"><input type="checkbox" id="searchChk"><span>인터넷 검색해서 최신 정보로 알려주기<small>항공 노선, 일정, 가격, 최근 소식처럼 바뀌는 정보를 검색해 확인합니다. 답이 몇 초 늦어질 수 있어요.</small></span></label>
+      </fieldset>
+
+      <fieldset>
         <legend>배경 메모 (정보 귓속말용)</legend>
         <div class="row"><span>회의 주제, 내 역할, 미리 알아둘 수치나 자료를 적어 두면 귓속말이 훨씬 정확해집니다.</span>
           <textarea id="memo" placeholder="예) 나는 시청 정책 담당 과장. 오늘은 ○○산업 지원사업 관련 기업 간담회. 사업비 총 120억(국비 60), 2027년 착공 목표. 상대가 지원 조건을 물으면 핵심만 알려줘."></textarea>
@@ -272,7 +294,9 @@ legend{font-weight:700;font-size:15px;padding:0;margin-bottom:8px}
           <li><b>크롬</b>으로 열고, 처음 시작할 때 <b>마이크 허용</b>을 눌러 주세요.</li>
           <li>블루투스 이어폰을 연결하면 통역과 귓속말이 이어폰으로만 들립니다.</li>
           <li>이어폰을 연결하면 휴대폰이 이어폰 마이크로 듣는 경우가 있어, 상대 목소리가 작게 잡힐 수 있습니다. 그럴 땐 휴대폰을 상대 쪽으로 두거나 이어폰 설정에서 통화용 마이크 사용을 꺼 보세요.</li>
-          <li>화면이 꺼지거나 다른 앱으로 넘어가면 듣기가 멈춥니다. 켜 두는 동안은 화면이 자동으로 꺼지지 않게 해 둡니다.</li>
+          <li>웹 화면이라 <b>화면이 꺼지거나 다른 앱으로 넘어가면 듣기가 멈춥니다.</b> 켜 둘 때는 위쪽 <b>어둡게</b>를 누르면 화면이 검게 바뀌어 배터리를 아끼면서 계속 듣습니다(두 번 누르면 돌아옴).</li>
+          <li>다른 앱을 쓰면서 켜 두려면 갤럭시의 <b>팝업 화면·분할 화면</b>으로 이 화면을 작게 띄워 두세요. 화면에 보이는 동안은 계속 듣습니다.</li>
+          <li>Gemini <b>무료</b> 키로 보낸 대화는 구글이 서비스 개선에 쓸 수 있습니다. 민감한 업무 회의에서는 끄거나, 결제를 연결한 유료 키를 쓰세요.</li>
           <li>AI 정보는 틀릴 수 있으니 중요한 수치는 확인 후 사용하세요.</li>
         </ul>
       </fieldset>
@@ -321,10 +345,13 @@ const LANGS={
 
 /* ───────── 설정·기록 저장 (이 브라우저에만) ───────── */
 const DEF={engine:'gemini',geminiKey:'',claudeKey:'',geminiModel:'',claudeModel:'',transMode:'free',
-  partner:'en',assistLang:'ko',auto:'question',interval:60,readMine:false,chime:true,mediaBtn:false,
-  voice:'',rate:1.1,volume:0.9,memo:''};
+  partner:'en',assistLang:'ko',auto:'smart',freq:'mid',search:true,readMine:false,chime:true,mediaBtn:false,
+  voice:'',rate:1.1,volume:0.9,memo:'',v:2};
 let S=Object.assign({},DEF);
 try{Object.assign(S,JSON.parse(localStorage.getItem('whisper.settings')||'{}'));}catch(e){}
+if(S.v!==2){S.auto='smart';S.freq='mid';S.search=true;S.v=2;}
+if(!['smart','question','off'].includes(S.auto))S.auto='smart';
+const FREQ={low:{gap:90000,fresh:4},mid:{gap:45000,fresh:3},high:{gap:20000,fresh:2}};
 function saveS(){try{localStorage.setItem('whisper.settings',JSON.stringify(S));}catch(e){}}
 let log=[];
 try{log=JSON.parse(localStorage.getItem('whisper.log')||'[]');if(!Array.isArray(log))log=[];}catch(e){log=[];}
@@ -333,7 +360,7 @@ let mode='interp';
 try{mode=localStorage.getItem('whisper.mode')==='assist'?'assist':'interp';}catch(e){}
 
 let running=false,myTurn=false,busy=false,lastAskAt=0,lastAskIdx=log.length,qTimer=null,seq=0;
-let ttsChain=Promise.resolve(),whispered=[],lastSummary='';
+let ttsChain=Promise.resolve(),whispered=[],lastSummary='',searchBroken=false;
 
 /* ───────── 상태 표시 ───────── */
 function setStatus(t,s){const p=$('#pill');p.dataset.s=s||'idle';$('#pillText').textContent=t;p.title=t;}
@@ -356,8 +383,8 @@ function whoLabel(e){
 function renderGuide(){
   const g=document.createElement('div');g.className='guide';g.id='guide';
   g.innerHTML=mode==='interp'
-    ?'<h2>실시간 통역</h2><ol><li>블루투스 이어폰을 연결하고 상대 언어를 고릅니다.</li><li><b>시작</b>을 누르면 상대 말이 한국어로 이어폰에 들립니다.</li><li>내가 말할 땐 <b>내가 말하기</b>를 누르고 한국어로 말하면, 번역문이 화면에 크게 떠서 상대에게 보여줄 수 있습니다.</li></ol><p>통역은 키 없이 무료 번역으로도 됩니다.</p>'
-    :'<h2>정보 귓속말</h2><ol><li>설정에서 AI 키를 넣고 <b>배경 메모</b>에 회의 주제와 내 역할을 적어 둡니다.</li><li><b>시작</b>을 누르면 대화를 들으며, 질문이 나오거나 필요한 정보가 있을 때 짧게 이어폰으로 알려줍니다.</li><li>바로 듣고 싶으면 <b>지금 알려줘</b>, 궁금한 걸 직접 물으려면 아래 입력칸에 적어 보내세요.</li></ol><p>끝나면 <b>요약·저장</b>으로 대화 요약과 전체 기록을 파일로 남길 수 있습니다.</p>';
+    ?'<h2>실시간 통역</h2><ol><li>블루투스 이어폰을 연결하고 상대 언어를 고릅니다.</li><li><b>시작</b>을 누르면 상대 말이 한국어로 이어폰에 들립니다.</li><li>내가 말할 땐 <b>내가 말하기</b>를 누르고 한국어로 말하면, 번역문이 화면에 크게 떠서 상대에게 보여줄 수 있습니다.</li></ol><p>통역은 키 없이 무료 번역으로도 됩니다. AI 키를 넣어 두면 통역 중에도 대화에 필요한 정보를 알아서 귓속말해 줍니다.</p>'
+    :'<h2>정보 귓속말</h2><ol><li>설정에서 AI 키를 넣습니다. <b>배경 메모</b>에 내 역할이나 오늘 일정을 적어 두면 더 정확해집니다.</li><li><b>시작</b>을 누르고 평소처럼 대화하세요. 묻지 않아도 대화 주제에 맞는 정보(예: 청두 여행 이야기 → 김해–청두 직항 운항 여부)를 필요할 때만 짧게 이어폰으로 알려줍니다.</li><li>켜 둔 채 휴대폰을 내려놓을 땐 위쪽 <b>어둡게</b>를 누르세요.</li></ol><p>끝나면 <b>요약·저장</b>으로 대화 요약과 전체 기록을 파일로 남길 수 있습니다.</p>';
   return g;
 }
 function entryEl(e){
@@ -492,7 +519,8 @@ async function llm(system,user,o){
     const model=S.geminiModel||'gemini-flash-latest';
     const body={systemInstruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:user}]}],
       generationConfig:{temperature:o.temp==null?0.3:o.temp,maxOutputTokens:max+1500}};
-    if(o.json)body.generationConfig.responseMimeType='application/json';
+    if(o.search)body.tools=[{google_search:{}}];          // 구글 검색으로 최신 정보 확인
+    else if(o.json)body.generationConfig.responseMimeType='application/json';
     const r=await fetchT('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(S.geminiKey),
       {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},o.timeout||30000);
     const j=await r.json().catch(()=>({}));
@@ -503,7 +531,8 @@ async function llm(system,user,o){
   if(S.engine==='claude'&&S.claudeKey){
     const model=S.claudeModel||'claude-haiku-4-5';
     const r=await fetchT('https://api.anthropic.com/v1/messages',{method:'POST',headers:claudeHeaders(),
-      body:JSON.stringify({model,max_tokens:max,temperature:o.temp==null?0.3:o.temp,system,messages:[{role:'user',content:user}]})},o.timeout||30000);
+      body:JSON.stringify(Object.assign({model,max_tokens:max+(o.search?800:0),temperature:o.temp==null?0.3:o.temp,system,messages:[{role:'user',content:user}]},
+        o.search?{tools:[{type:'web_search_20250305',name:'web_search',max_uses:2}]}:{}))},o.timeout||30000);
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(apiErr(j,r.status));
     return (j.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('').trim();
@@ -516,7 +545,7 @@ function parseJSON(t){
   try{return JSON.parse(t);}catch(e){}
   const a=t.indexOf('{'),b=t.lastIndexOf('}');
   if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}
-  return {say:t.trim()};
+  return {say:t.trim(),loose:true};
 }
 async function listModels(){
   if(S.engine==='gemini'){
@@ -552,7 +581,7 @@ const Rec={
       let interim='';
       for(let i=e.resultIndex;i<e.results.length;i++){
         const x=e.results[i];
-        if(x.isFinal){const t=x[0].transcript.trim();if(t)onFinal(t);}
+        if(x.isFinal){const t=x[0].transcript.trim();if(t)onRecFinal(t);}
         else interim+=x[0].transcript;
       }
       showLive(interim.trim());this.quick=0;
@@ -580,12 +609,53 @@ function showLive(t){
   if(t){n.textContent=t;n.classList.remove('dim');}
 }
 
-/* ───────── 들은 말 처리 ───────── */
+/* ───────── 들은 말 처리 ─────────
+   안드로이드 크롬은 한 문장을 "지금" → "지금 몇" → "지금 몇 시입니까"처럼
+   여러 번 나눠 확정해 보내므로, 이어지는 말은 합쳐서 0.9초 쉬면 한 번만 처리합니다. */
+let pendFinal='',pendTimer=null,lastCommitted='',lastCommittedAt=0;
+const norm=s=>s.replace(/[\s.,!?？。、·~…'"“”‘’]/g,'').toLowerCase();
+function onRecFinal(t){
+  const a=norm(pendFinal),b=norm(t);
+  if(pendFinal&&(b.startsWith(a)||a.startsWith(b))){if(b.length>=a.length)pendFinal=t;}
+  else{if(pendFinal)commitFinal(pendFinal);pendFinal=t;}
+  clearTimeout(pendTimer);
+  pendTimer=setTimeout(flushFinal,900);
+}
+function flushFinal(){clearTimeout(pendTimer);const t=pendFinal;pendFinal='';if(t)commitFinal(t);}
+function commitFinal(t){
+  const now=Date.now(),last=norm(lastCommitted),cur=norm(t);
+  if(now-lastCommittedAt<6000&&last){
+    if(cur===last||last.startsWith(cur))return;          // 같은 말 반복
+    if(cur.startsWith(last)){                               // 앞에 확정한 말 + 새 말
+      const rest=t.trim().slice(lastCommitted.trim().length).trim();
+      if(!rest)return;
+      lastCommitted=t;lastCommittedAt=now;onFinal(rest);return;
+    }
+  }
+  lastCommitted=t;lastCommittedAt=now;onFinal(t);
+}
 function onFinal(text){
   $('#liveNow').textContent=text;$('#liveNow').classList.remove('dim');
   if(mode==='interp'){
     if(myTurn)handleMine(text);else handlePartner(text);
   }else handleRoom(text);
+  scheduleSmart(text);
+}
+/* 묻지 않아도 알려주기: 말이 잠깐 멈추면(2.5초) 대화 흐름을 보고 필요한 정보가 있을 때만 귓속말 */
+let smartTimer=null;
+function scheduleSmart(text){
+  if(S.auto==='off'||!hasAI())return;
+  const q=isQuestion(text);
+  if(q){clearTimeout(qTimer);qTimer=setTimeout(()=>trySmart(true),1800);return;}
+  if(S.auto==='question')return;
+  clearTimeout(smartTimer);
+  smartTimer=setTimeout(()=>trySmart(false),2500);
+}
+function trySmart(isQ){
+  if(!running||busy||S.auto==='off')return;
+  const f=FREQ[S.freq]||FREQ.mid,fresh=log.length-lastAskIdx,since=Date.now()-lastAskAt;
+  if(isQ){if(since>10000&&fresh>=1)askAI(false);return;}
+  if(S.auto==='smart'&&fresh>=f.fresh&&since>f.gap)askAI(false);
 }
 function handlePartner(text){
   const e=addEntry({who:'partner',lang:S.partner,orig:text,pending:true});
@@ -607,10 +677,6 @@ function handleRoom(text){
   if(S.assistLang!=='ko'){
     freeTranslate(text,LANGS[S.assistLang].gt,'ko').then(ko=>{e.tr=ko;updateEntry(e);}).catch(()=>{});
   }
-  if((S.auto==='question'||S.auto==='both')&&hasAI()&&isQuestion(text)){
-    clearTimeout(qTimer);
-    qTimer=setTimeout(()=>{if(Date.now()-lastAskAt>12000)askAI(false);},1800);
-  }
 }
 function isQuestion(t){
   t=t.trim();
@@ -621,10 +687,11 @@ function isQuestion(t){
   if(/(吗|呢|么)[。？]?$/.test(t)||/(ですか|ますか|でしょうか)[。]?$/.test(t))return true;
   return false;
 }
+// 쉬지 않고 이어지는 대화를 위한 보조 확인
 setInterval(()=>{
-  if(running&&mode==='assist'&&(S.auto==='interval'||S.auto==='both')&&hasAI()&&!busy){
-    const fresh=log.length-lastAskIdx;
-    if(fresh>=2&&Date.now()-lastAskAt>(+S.interval||60)*1000)askAI(false);
+  if(running&&S.auto==='smart'&&hasAI()&&!busy){
+    const f=FREQ[S.freq]||FREQ.mid;
+    if(log.length-lastAskIdx>=f.fresh*2&&Date.now()-lastAskAt>f.gap*1.5)askAI(false);
   }
 },5000);
 
@@ -639,18 +706,32 @@ async function askAI(manual,question){
   if(!hasAI()){setStatus('정보 귓속말은 설정에서 AI 키를 넣어야 쓸 수 있어요','err');openSettings();return;}
   if(busy)return;
   busy=true;setStatus('생각 중','think');
-  const sys='너는 회의·면담 중인 사용자의 귀에 대고 짧게 귓속말해 주는 보좌관이다. 대화 전사문은 자동 음성인식이라 오류가 있을 수 있으니 문맥으로 짐작해 읽는다.\n'
-    +'규칙:\n- 지금 사용자에게 가장 도움이 될 정보 한 가지를 한국어 1~2문장(80자 이내), 귀로 듣기 쉬운 말투로 say에 쓴다.\n'
-    +'- 우선순위: ① 방금 상대가 한 질문에 대한 답변 포인트 ② 언급된 수치·제도·용어·인물의 핵심 설명 ③ 놓치면 안 되는 쟁점이나 확인할 점.\n'
-    +'- 배경 메모의 사실을 우선 사용하고, 확실하지 않은 수치는 "확인 필요"라고 덧붙인다.\n'
-    +'- 이미 귓속말한 내용은 반복하지 않는다. '+(manual?'사용자가 직접 요청했으니 반드시 가장 쓸모 있는 한 가지를 알려준다.':'새로 알려줄 만한 것이 없으면 say를 빈 문자열로 둔다.')+'\n'
-    +'- detail에는 화면으로 볼 보충 설명을 200자 이내로 쓴다(없으면 빈 문자열).\n'
-    +'- 출력은 JSON 한 개: {"say":"...","detail":"..."}';
-  const user='[배경 메모]\n'+(S.memo||'(없음)')+'\n\n[이미 귓속말한 내용]\n'+(whispered.slice(-8).join('\n')||'(없음)')+'\n\n[최근 대화]\n'+(convoText(6000)||'(아직 없음)')
+  const strict={low:'아주 엄격하게: 대화에 실제로 쓸 만한 구체적 사실일 때만 말한다.',mid:'꽤 엄격하게: 대화에 도움이 될 구체적 사실일 때만 말한다.',high:'조금 너그럽게: 대화에 보탬이 될 만한 구체적 사실이면 말한다.'}[S.freq]||'';
+  const now=new Date();
+  const sys='너는 사용자의 귀에 대고 짧게 귓속말해 주는 눈치 빠른 비서다. 사용자는 묻지 않는다. 대화를 옆에서 듣다가, 지금 대화 주제에 대해 사용자가 알면 바로 써먹을 수 있는 정보를 알아서 챙겨 준다.\n'
+    +'예) 부산에서 청두 여행 이야기가 나오면 → "김해–청두 직항이 주 ○회 있고, 비행시간은 약 ○시간이에요." / 어떤 회사 이야기가 나오면 → 최근 실적이나 소식 한 줄 / 상대가 질문하면 → 답변 포인트.\n'
+    +'규칙:\n'
+    +'- 대화 전사문은 자동 음성인식이라 오류가 있을 수 있으니 문맥으로 짐작해 읽는다.\n'
+    +'- say: 한국어 1~2문장(80자 이내), 귀로 듣기 쉬운 말투. 노선·일정·가격·수치·제도·최근 소식처럼 구체적인 사실 하나.\n'
+    +'- 금지: 일반 상식, 뻔한 조언, 맞장구, 대화 요약, "~에 대해 이야기하고 계시네요" 같은 말.\n'
+    +'- 바뀔 수 있는 정보(항공편, 일정, 가격, 영업, 최근 소식)는 '+(S.search?'인터넷 검색으로 확인해서 말한다.':'확실하지 않으면 "확인 필요"라고 붙인다.')+'\n'
+    +'- 배경 메모의 사실을 우선 사용한다. 이미 귓속말한 내용·주제는 반복하지 않는다.\n'
+    +'- '+(manual||question?'사용자가 직접 요청했으니 반드시 가장 쓸모 있는 한 가지를 알려준다.':strict+' 알려줄 만한 게 없으면 say를 빈 문자열로 둔다. 애매하면 말하지 않는 쪽을 택한다.')+'\n'
+    +'- detail: 화면으로 볼 보충 설명 200자 이내(출처가 있으면 사이트 이름), 없으면 빈 문자열.\n'
+    +'- 출력은 다른 말 없이 JSON 한 개만: {"say":"...","detail":"..."}';
+  const user='[현재 시각] '+now.toLocaleString('ko-KR',{dateStyle:'full',timeStyle:'short'})+'\n\n[배경 메모]\n'+(S.memo||'(없음)')+'\n\n[이미 귓속말한 내용]\n'+(whispered.slice(-10).join('\n')||'(없음)')+'\n\n[최근 대화]\n'+(convoText(6000)||'(아직 없음)')
     +(question?'\n\n[사용자가 직접 물은 것]\n'+question+'\n→ 이 질문에 답하는 내용을 say에 쓴다.':'');
   try{
-    const o=parseJSON(await llm(sys,user,{json:true,max:600}));
-    const say=(o.say||'').trim(),detail=(o.detail||'').trim();
+    let raw;
+    try{raw=await llm(sys,user,{json:true,max:700,search:S.search&&!searchBroken,timeout:40000});}
+    catch(err){
+      if(S.search&&!searchBroken&&!/키가 올바르지/.test(err.message)){searchBroken=true;raw=await llm(sys,user,{json:true,max:700});}
+      else throw err;
+    }
+    const o=parseJSON(raw);
+    let say=(o.say||'').trim();const detail=(o.detail||'').trim();
+    if(o.loose&&!manual&&!question)say='';                 // 형식에 안 맞는 답은 알아서 모드에선 말하지 않음
+    if(o.loose&&say.length>160)say=say.slice(0,160);
     if(say){
       addEntry({who:'ai',tr:say,orig:detail});whispered.push(say);
       chime();setTimeout(()=>speak(say,'ko-KR'),S.chime?380:0);
@@ -680,7 +761,8 @@ function start(){
   setStatus('듣는 중','listen');updateUI();
 }
 function stopAll(){
-  running=false;myTurn=false;Rec.stop();
+  flushFinal();
+  running=false;myTurn=false;Rec.stop();clearTimeout(smartTimer);hideDim();
   try{speechSynthesis.cancel();}catch(e){}
   try{wakeLock&&wakeLock.release();}catch(e){} wakeLock=null;
   stopMediaBtn();setStatus('멈춤','idle');updateUI();
@@ -734,7 +816,7 @@ function updateUI(){
   const sb=$('#startBtn');sb.textContent=running?'멈춤':'시작';sb.classList.toggle('on',running);
   const tb=$('#turnBtn');tb.textContent=myTurn?'말씀하세요…':'내가 말하기';tb.classList.toggle('on',myTurn);
   $('#askInput').placeholder=mode==='interp'?'직접 입력 → '+LANGS[S.partner].name+'로 통역':'AI에게 직접 묻기 (답을 귓속말로)';
-  $('#liveLbl').textContent=mode==='interp'?(myTurn?'내 말 (한국어)':'상대 말 ('+LANGS[S.partner].name+')'):'회의 대화 ('+LANGS[S.assistLang].name+')';
+  $('#liveLbl').textContent=mode==='interp'?(myTurn?'내 말 (한국어)':'상대 말 ('+LANGS[S.partner].name+')'):'주변 대화 ('+LANGS[S.assistLang].name+')';
 }
 function setMode(m){
   if(mode===m)return;mode=m;myTurn=false;
@@ -791,10 +873,15 @@ function fillLangSel(sel,val,skipKo){
 }
 fillLangSel($('#partnerSel'),S.partner,true);
 fillLangSel($('#assistLangSel'),S.assistLang,false);
-$('#autoSel').value=S.auto;
+document.querySelectorAll('.autoSel').forEach(s=>{
+  s.value=S.auto;
+  s.onchange=e=>{S.auto=e.target.value;saveS();document.querySelectorAll('.autoSel').forEach(x=>x.value=S.auto);
+    if(S.auto!=='off'&&!hasAI()){setStatus('정보 귓속말은 설정에서 AI 키를 넣어야 쓸 수 있어요','err');}};
+});
 $('#partnerSel').onchange=e=>{S.partner=e.target.value;saveS();if(running)Rec.setLang(curRecLang());updateUI();};
 $('#assistLangSel').onchange=e=>{S.assistLang=e.target.value;saveS();if(running)Rec.setLang(curRecLang());updateUI();};
-$('#autoSel').onchange=e=>{S.auto=e.target.value;saveS();};
+$('#freqSel').onchange=e=>{S.freq=e.target.value;saveS();};
+$('#searchChk').onchange=e=>{S.search=e.target.checked;searchBroken=false;saveS();};
 
 function modelKey(){return S.engine==='claude'?'claudeModel':'geminiModel';}
 function fillModels(list){
@@ -851,6 +938,7 @@ $('#clearLog').onclick=()=>{
 };
 function openSettings(){
   $('#gemKey').value=S.geminiKey;$('#claKey').value=S.claudeKey;
+  $('#freqSel').value=S.freq;$('#searchChk').checked=!!S.search;
   $('#transSel').value=S.transMode;$('#readMine').checked=!!S.readMine;$('#chimeChk').checked=!!S.chime;$('#mediaChk').checked=!!S.mediaBtn;
   $('#rate').value=S.rate;$('#vol').value=S.volume;rangeUI();$('#memo').value=S.memo;$('#clearMsg').textContent='';
   loadVoices();syncEngineUI();
@@ -858,6 +946,13 @@ function openSettings(){
 }
 $('#setBtn').onclick=openSettings;
 $('#setClose').onclick=()=>$('#setDlg').close();
+
+/* ───────── 화면 어둡게: 켜 둔 채로 화면만 검게 (배터리 절약) ───────── */
+let lastTap=0;
+function showDim(){if(!running)start();if(!running)return;$('#dim').hidden=false;}
+function hideDim(){$('#dim').hidden=true;}
+$('#dimBtn').onclick=showDim;
+$('#dim').addEventListener('click',()=>{const n=Date.now();if(n-lastTap<600){hideDim();lastTap=0;}else lastTap=n;});
 
 /* ───────── 버튼 연결 ───────── */
 $('#tabInterp').onclick=()=>setMode('interp');
